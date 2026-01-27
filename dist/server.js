@@ -32,7 +32,35 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
     }
   };
 }
+
+// src/userRoute.ts
+import { NextResponse as NextResponse2 } from "next/server";
+import { jwtVerify as jwtVerify2, createRemoteJWKSet as createRemoteJWKSet2 } from "jose";
+var JWKS2 = createRemoteJWKSet2(new URL("/.well-known/jwks.json", process.env.WATSON_AUTH_URL));
+function createUserGET() {
+  return async (request) => {
+    const token = request.cookies.get("access_token")?.value;
+    if (!token) {
+      return NextResponse2.json({ user: null }, { status: 401 });
+    }
+    try {
+      const { payload } = await jwtVerify2(token, JWKS2, {
+        issuer: process.env.WATSON_AUTH_URL
+      });
+      const user = {
+        id: typeof payload.sub === "string" ? payload.sub : "",
+        email: typeof payload.email === "string" ? payload.email : "",
+        name: typeof payload.name === "string" ? payload.name : null,
+        emailVerified: Boolean(payload.emailVerified)
+      };
+      return NextResponse2.json({ user });
+    } catch (error) {
+      return NextResponse2.json({ user: null }, { status: 401 });
+    }
+  };
+}
 export {
+  createUserGET,
   createWatsonAuthProxy
 };
 //# sourceMappingURL=server.js.map

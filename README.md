@@ -64,7 +64,41 @@ export const POST = await createLogoutPOST()
 
 This clears the access token cookie on logout.
 
-### 4. Logout UI Component
+### 4. User Info API Route
+
+Create `app/api/me/route.ts`:
+
+```typescript
+import { createUserGET } from '@/lib/watsonauth/userRoute'
+
+export const GET = createUserGET()
+```
+
+Client usage:
+
+```typescript
+const res = await fetch('/api/me')
+const { user } = await res.json()
+// user.name -> string | null
+```
+
+This returns the user from the access token stored in the httpOnly cookie.
+
+### 5. Client Hook (React)
+
+```typescript
+import { useWatsonUser } from '@watsonauth/sdk/react'
+
+function Header() {
+  const { user, isLoading } = useWatsonUser()
+
+  if (isLoading) return <div>Loading...</div>
+
+  return <div>Welcome {user?.name}</div>
+}
+```
+
+### 6. Logout UI Component
 
 Add the `UserProfileDropdown` component to your header or layout:
 

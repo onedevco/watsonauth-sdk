@@ -20,6 +20,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/server.ts
 var server_exports = {};
 __export(server_exports, {
+  createUserGET: () => createUserGET,
   createWatsonAuthProxy: () => createWatsonAuthProxy
 });
 module.exports = __toCommonJS(server_exports);
@@ -58,8 +59,36 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
     }
   };
 }
+
+// src/userRoute.ts
+var import_server2 = require("next/server");
+var import_jose2 = require("jose");
+var JWKS2 = (0, import_jose2.createRemoteJWKSet)(new URL("/.well-known/jwks.json", process.env.WATSON_AUTH_URL));
+function createUserGET() {
+  return async (request) => {
+    const token = request.cookies.get("access_token")?.value;
+    if (!token) {
+      return import_server2.NextResponse.json({ user: null }, { status: 401 });
+    }
+    try {
+      const { payload } = await (0, import_jose2.jwtVerify)(token, JWKS2, {
+        issuer: process.env.WATSON_AUTH_URL
+      });
+      const user = {
+        id: typeof payload.sub === "string" ? payload.sub : "",
+        email: typeof payload.email === "string" ? payload.email : "",
+        name: typeof payload.name === "string" ? payload.name : null,
+        emailVerified: Boolean(payload.emailVerified)
+      };
+      return import_server2.NextResponse.json({ user });
+    } catch (error) {
+      return import_server2.NextResponse.json({ user: null }, { status: 401 });
+    }
+  };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  createUserGET,
   createWatsonAuthProxy
 });
 //# sourceMappingURL=server.cjs.map

@@ -99,7 +99,44 @@ async function logout() {
   localStorage.removeItem("access_token");
   window.location.href = "/";
 }
+
+// src/useWatsonUser.ts
+import { useEffect as useEffect2, useMemo, useState as useState2 } from "react";
+function useWatsonUser(options = {}) {
+  const { endpoint = "/api/me", auto = true } = options;
+  const [user, setUser] = useState2(null);
+  const [isLoading, setIsLoading] = useState2(false);
+  const [error, setError] = useState2(null);
+  const refresh = useMemo(() => {
+    return async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(endpoint, {
+          credentials: "include"
+        });
+        if (!response.ok) {
+          setUser(null);
+          return;
+        }
+        const data = await response.json();
+        setUser(data.user ?? null);
+      } catch (err) {
+        setUser(null);
+        setError(err instanceof Error ? err : new Error("Failed to load user"));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  }, [endpoint]);
+  useEffect2(() => {
+    if (!auto) return;
+    void refresh();
+  }, [auto, refresh]);
+  return { user, isLoading, error, refresh };
+}
 export {
-  UserProfileDropdown
+  UserProfileDropdown,
+  useWatsonUser
 };
 //# sourceMappingURL=react.js.map

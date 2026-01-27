@@ -20,7 +20,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/react.tsx
 var react_exports = {};
 __export(react_exports, {
-  UserProfileDropdown: () => UserProfileDropdown
+  UserProfileDropdown: () => UserProfileDropdown,
+  useWatsonUser: () => useWatsonUser
 });
 module.exports = __toCommonJS(react_exports);
 
@@ -125,8 +126,45 @@ async function logout() {
   localStorage.removeItem("access_token");
   window.location.href = "/";
 }
+
+// src/useWatsonUser.ts
+var import_react2 = require("react");
+function useWatsonUser(options = {}) {
+  const { endpoint = "/api/me", auto = true } = options;
+  const [user, setUser] = (0, import_react2.useState)(null);
+  const [isLoading, setIsLoading] = (0, import_react2.useState)(false);
+  const [error, setError] = (0, import_react2.useState)(null);
+  const refresh = (0, import_react2.useMemo)(() => {
+    return async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(endpoint, {
+          credentials: "include"
+        });
+        if (!response.ok) {
+          setUser(null);
+          return;
+        }
+        const data = await response.json();
+        setUser(data.user ?? null);
+      } catch (err) {
+        setUser(null);
+        setError(err instanceof Error ? err : new Error("Failed to load user"));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  }, [endpoint]);
+  (0, import_react2.useEffect)(() => {
+    if (!auto) return;
+    void refresh();
+  }, [auto, refresh]);
+  return { user, isLoading, error, refresh };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  UserProfileDropdown
+  UserProfileDropdown,
+  useWatsonUser
 });
 //# sourceMappingURL=react.cjs.map
