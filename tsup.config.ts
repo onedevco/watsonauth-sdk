@@ -6,6 +6,7 @@ export default defineConfig({
     react: 'src/react.tsx',
     next: 'src/next.ts',
     server: 'src/server.ts',
+    userRoute: 'src/userRoute.ts',
     Logout: 'src/Logout.tsx',
   },
   format: ['cjs', 'esm'],

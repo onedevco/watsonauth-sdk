@@ -1,6 +1,6 @@
 {
   "name": "@watsonauth/sdk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Client-side SDK for Watson Auth integration",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -55,6 +55,16 @@
       "require": {
         "types": "./dist/Logout.d.cts",
         "default": "./dist/Logout.cjs"
+      }
+    },
+    "./userRoute": {
+      "import": {
+        "types": "./dist/userRoute.d.ts",
+        "default": "./dist/userRoute.js"
+      },
+      "require": {
+        "types": "./dist/userRoute.d.cts",
+        "default": "./dist/userRoute.cjs"
       }
     }
   },
