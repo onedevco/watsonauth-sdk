@@ -1,11 +1,7 @@
-import { T as TokenPayload } from './types-DxWqrLJy.cjs';
+import { NextRequest, NextResponse } from 'next/server';
 
-interface VerifyTokenOptions {
-    jwksUrl: string;
-    issuer?: string;
-    audience?: string;
-}
-declare function verifyToken(token: string, options: VerifyTokenOptions): Promise<TokenPayload>;
-declare function clearJwksCache(): void;
+declare function createWatsonAuthProxy({ initPublicPaths }: {
+    initPublicPaths?: string[];
+}): (request: NextRequest) => Promise<NextResponse<unknown>>;
 
-export { TokenPayload, type VerifyTokenOptions, clearJwksCache, verifyToken };
+export { createWatsonAuthProxy };

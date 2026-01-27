@@ -1,34 +1,38 @@
-// src/server.ts
-import * as jose from "jose";
-var jwksCache = /* @__PURE__ */ new Map();
-async function verifyToken(token, options) {
-  const { jwksUrl, issuer, audience } = options;
-  let jwks = jwksCache.get(jwksUrl);
-  if (!jwks) {
-    jwks = jose.createRemoteJWKSet(new URL(jwksUrl));
-    jwksCache.set(jwksUrl, jwks);
-  }
-  const verifyOptions = {};
-  if (issuer) verifyOptions.issuer = issuer;
-  if (audience) verifyOptions.audience = audience;
-  const { payload } = await jose.jwtVerify(token, jwks, verifyOptions);
-  return {
-    sub: payload.sub,
-    email: payload.email,
-    name: payload.name ?? null,
-    emailVerified: payload.emailVerified,
-    appId: payload.appId,
-    iss: payload.iss,
-    aud: Array.isArray(payload.aud) ? payload.aud[0] : payload.aud,
-    exp: payload.exp,
-    iat: payload.iat
+// src/proxy.ts
+import { NextResponse } from "next/server";
+import { jwtVerify, createRemoteJWKSet } from "jose";
+var JWKS = createRemoteJWKSet(new URL("/.well-known/jwks.json", process.env.WATSON_AUTH_URL));
+function createWatsonAuthProxy({ initPublicPaths = [] }) {
+  const publicPaths = ["/login", "/callback", ...initPublicPaths];
+  return async (request) => {
+    const { pathname } = request.nextUrl;
+    if (publicPaths.some((p) => pathname === p || pathname.startsWith("/api/public"))) {
+      return NextResponse.next();
+    }
+    const token = request.cookies.get("access_token")?.value;
+    if (!token) {
+      const loginUrl = new URL("/login", process.env.WATSON_AUTH_URL);
+      loginUrl.searchParams.set("app", process.env.WATSON_AUTH_APP_SLUG);
+      loginUrl.searchParams.set("callback", `${process.env.NEXT_PUBLIC_APP_URL}/callback`);
+      console.log("redirecting to login", loginUrl.toString());
+      return NextResponse.redirect(loginUrl);
+    }
+    try {
+      await jwtVerify(token, JWKS, {
+        issuer: process.env.WATSON_AUTH_URL
+      });
+      console.log("token verified");
+      return NextResponse.next();
+    } catch (error) {
+      console.log("error", error);
+      const loginUrl = new URL("/login", process.env.WATSON_AUTH_URL);
+      loginUrl.searchParams.set("app", process.env.WATSON_AUTH_APP_SLUG);
+      loginUrl.searchParams.set("callback", `${process.env.NEXT_PUBLIC_APP_URL}/callback`);
+      return NextResponse.redirect(loginUrl);
+    }
   };
 }
-function clearJwksCache() {
-  jwksCache.clear();
-}
 export {
-  clearJwksCache,
-  verifyToken
+  createWatsonAuthProxy
 };
 //# sourceMappingURL=server.js.map

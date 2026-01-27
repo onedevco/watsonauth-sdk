@@ -1,9 +1,7 @@
 "use strict";
-var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -17,77 +15,56 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/next.ts
 var next_exports = {};
 __export(next_exports, {
-  withAuth: () => withAuth
+  createCallbackGET: () => createCallbackGET,
+  createLogoutPOST: () => createLogoutPOST
 });
 module.exports = __toCommonJS(next_exports);
+
+// src/callback.ts
 var import_server = require("next/server");
-var jose = __toESM(require("jose"), 1);
-function withAuth(options) {
-  const {
-    jwksUrl,
-    publicPaths = [],
-    loginPath = "/login",
-    issuer,
-    audience
-  } = options;
-  let jwks = null;
-  return async function middleware(request) {
-    const { pathname } = request.nextUrl;
-    const isPublicPath = publicPaths.some((path) => {
-      if (path.endsWith("*")) {
-        return pathname.startsWith(path.slice(0, -1));
-      }
-      return pathname === path;
+function createCallbackGET() {
+  return async (request) => {
+    const accessToken = request.nextUrl.searchParams.get("token");
+    const redirectTo = request.nextUrl.searchParams.get("redirect") || "/";
+    if (!accessToken) {
+      return import_server.NextResponse.redirect(new URL("/login", request.url));
+    }
+    const response = import_server.NextResponse.redirect(new URL(redirectTo, request.url));
+    response.cookies.set("access_token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 15,
+      // 15 minutes (match token expiry)
+      path: "/"
     });
-    if (isPublicPath) {
-      return import_server.NextResponse.next();
-    }
-    const token = request.cookies.get("watsonauth_token")?.value || request.headers.get("authorization")?.replace("Bearer ", "");
-    if (!token) {
-      const loginUrl = new URL(loginPath, request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return import_server.NextResponse.redirect(loginUrl);
-    }
-    try {
-      if (!jwks) {
-        jwks = jose.createRemoteJWKSet(new URL(jwksUrl));
-      }
-      const verifyOptions = {};
-      if (issuer) verifyOptions.issuer = issuer;
-      if (audience) verifyOptions.audience = audience;
-      const { payload } = await jose.jwtVerify(token, jwks, verifyOptions);
-      const requestHeaders = new Headers(request.headers);
-      requestHeaders.set("x-user-id", payload.sub);
-      requestHeaders.set("x-user-email", payload.email);
-      return import_server.NextResponse.next({
-        request: {
-          headers: requestHeaders
-        }
-      });
-    } catch {
-      const loginUrl = new URL(loginPath, request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      const response = import_server.NextResponse.redirect(loginUrl);
-      response.cookies.delete("watsonauth_token");
-      return response;
-    }
+    return response;
+  };
+}
+
+// src/logoutRoute.ts
+var import_server2 = require("next/server");
+function createLogoutPOST() {
+  return async () => {
+    const response = import_server2.NextResponse.json({ success: true });
+    response.cookies.set("access_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/"
+    });
+    return response;
   };
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  withAuth
+  createCallbackGET,
+  createLogoutPOST
 });
 //# sourceMappingURL=next.cjs.map

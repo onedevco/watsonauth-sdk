@@ -1,14 +1,4 @@
-export { WatsonAuth } from './client';
-export { AuthError } from './errors';
-export type {
-  User,
-  TokenPayload,
-  WatsonAuthConfig,
-  StorageAdapter,
-  LoginResult,
-  RegisterResult,
-  MessageResult,
-  RedirectOptions,
-  CallbackResult,
-  AuthStateCallback,
-} from './types';
+// Main entry point - import from specific entry points:
+// - @watsonauth/sdk/react for React components
+// - @watsonauth/sdk/next for Next.js route handlers
+// - @watsonauth/sdk/server for server middleware

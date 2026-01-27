@@ -1,58 +1,42 @@
-// src/next.ts
+// src/callback.ts
 import { NextResponse } from "next/server";
-import * as jose from "jose";
-function withAuth(options) {
-  const {
-    jwksUrl,
-    publicPaths = [],
-    loginPath = "/login",
-    issuer,
-    audience
-  } = options;
-  let jwks = null;
-  return async function middleware(request) {
-    const { pathname } = request.nextUrl;
-    const isPublicPath = publicPaths.some((path) => {
-      if (path.endsWith("*")) {
-        return pathname.startsWith(path.slice(0, -1));
-      }
-      return pathname === path;
+function createCallbackGET() {
+  return async (request) => {
+    const accessToken = request.nextUrl.searchParams.get("token");
+    const redirectTo = request.nextUrl.searchParams.get("redirect") || "/";
+    if (!accessToken) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    const response = NextResponse.redirect(new URL(redirectTo, request.url));
+    response.cookies.set("access_token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 15,
+      // 15 minutes (match token expiry)
+      path: "/"
     });
-    if (isPublicPath) {
-      return NextResponse.next();
-    }
-    const token = request.cookies.get("watsonauth_token")?.value || request.headers.get("authorization")?.replace("Bearer ", "");
-    if (!token) {
-      const loginUrl = new URL(loginPath, request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-    try {
-      if (!jwks) {
-        jwks = jose.createRemoteJWKSet(new URL(jwksUrl));
-      }
-      const verifyOptions = {};
-      if (issuer) verifyOptions.issuer = issuer;
-      if (audience) verifyOptions.audience = audience;
-      const { payload } = await jose.jwtVerify(token, jwks, verifyOptions);
-      const requestHeaders = new Headers(request.headers);
-      requestHeaders.set("x-user-id", payload.sub);
-      requestHeaders.set("x-user-email", payload.email);
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders
-        }
-      });
-    } catch {
-      const loginUrl = new URL(loginPath, request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.delete("watsonauth_token");
-      return response;
-    }
+    return response;
+  };
+}
+
+// src/logoutRoute.ts
+import { NextResponse as NextResponse2 } from "next/server";
+function createLogoutPOST() {
+  return async () => {
+    const response = NextResponse2.json({ success: true });
+    response.cookies.set("access_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/"
+    });
+    return response;
   };
 }
 export {
-  withAuth
+  createCallbackGET,
+  createLogoutPOST
 };
 //# sourceMappingURL=next.js.map
