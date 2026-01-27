@@ -46,6 +46,16 @@
         "types": "./dist/server.d.cts",
         "default": "./dist/server.cjs"
       }
+    },
+    "./Logout": {
+      "import": {
+        "types": "./dist/Logout.d.ts",
+        "default": "./dist/Logout.js"
+      },
+      "require": {
+        "types": "./dist/Logout.d.cts",
+        "default": "./dist/Logout.cjs"
+      }
     }
   },
   "files": [

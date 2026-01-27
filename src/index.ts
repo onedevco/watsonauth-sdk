@@ -2,3 +2,4 @@
 // - @watsonauth/sdk/react for React components
 // - @watsonauth/sdk/next for Next.js route handlers
 // - @watsonauth/sdk/server for server middleware
+// - @watsonauth/sdk/Logout for UserDropdown component
