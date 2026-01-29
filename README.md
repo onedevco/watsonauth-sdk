@@ -20,7 +20,7 @@ Create `proxy.ts` in your project root:
 
 ```typescript
 import type { NextRequest } from 'next/server'
-import { createWatsonAuthProxy } from '@/lib/watsonauth/proxy'
+import { createWatsonAuthProxy } from '@watsonauth/sdk/proxy'
 
 export async function proxy(request: NextRequest) {
     const watsonAuthProxy = createWatsonAuthProxy({
@@ -45,7 +45,7 @@ The proxy automatically:
 Create `app/callback/route.ts`:
 
 ```typescript
-import { createCallbackGET } from '@/lib/watsonauth/callback'
+import { createCallbackGET } from '@watsonauth/sdk/callback'
 
 export const GET = createCallbackGET()
 ```
@@ -57,7 +57,7 @@ This handles the OAuth callback, storing the access token in an httpOnly cookie.
 Create `app/api/logout/route.ts`:
 
 ```typescript
-import { createLogoutPOST } from '@/lib/watsonauth/logoutRoute'
+import { createLogoutPOST } from '@watsonauth/sdk/logoutRoute'
 
 export const POST = await createLogoutPOST()
 ```
@@ -69,7 +69,7 @@ This clears the access token cookie on logout.
 Create `app/api/me/route.ts`:
 
 ```typescript
-import { createUserGET } from '@/lib/watsonauth/userRoute'
+import { createUserGET } from '@watsonauth/sdk/userRoute'
 
 export const GET = createUserGET()
 ```
@@ -103,7 +103,7 @@ function Header() {
 Add the `UserProfileDropdown` component to your header or layout:
 
 ```typescript
-import { UserProfileDropdown } from '@/lib/watsonauth/Logout'
+import { UserProfileDropdown } from '@watsonauth/sdk/Logout'
 
 export function Header() {
   return (
