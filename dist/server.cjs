@@ -45,11 +45,19 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
       return import_server.NextResponse.redirect(loginUrl);
     }
     try {
-      await (0, import_jose.jwtVerify)(token, JWKS, {
+      const { payload } = await (0, import_jose.jwtVerify)(token, JWKS, {
         issuer: process.env.WATSON_AUTH_URL
       });
       console.log("token verified");
-      return import_server.NextResponse.next();
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-user-id", payload.sub);
+      console.log("requestHeaders", requestHeaders);
+      console.log({
+        request: { headers: requestHeaders }
+      });
+      return import_server.NextResponse.next({
+        request: { headers: requestHeaders }
+      });
     } catch (error) {
       console.log("error", error);
       const loginUrl = new URL("/login", process.env.WATSON_AUTH_URL);

@@ -18,11 +18,19 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
       return NextResponse.redirect(loginUrl);
     }
     try {
-      await jwtVerify(token, JWKS, {
+      const { payload } = await jwtVerify(token, JWKS, {
         issuer: process.env.WATSON_AUTH_URL
       });
       console.log("token verified");
-      return NextResponse.next();
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-user-id", payload.sub);
+      console.log("requestHeaders", requestHeaders);
+      console.log({
+        request: { headers: requestHeaders }
+      });
+      return NextResponse.next({
+        request: { headers: requestHeaders }
+      });
     } catch (error) {
       console.log("error", error);
       const loginUrl = new URL("/login", process.env.WATSON_AUTH_URL);
