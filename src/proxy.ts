@@ -27,11 +27,15 @@ export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPath
         }
 
         try {
-            await jwtVerify(token, JWKS, {
+            const { payload } = await jwtVerify(token, JWKS, {
                 issuer: process.env.WATSON_AUTH_URL
             })
             console.log('token verified')
-            return NextResponse.next()
+            const requestHeaders = new Headers(request.headers)
+            requestHeaders.set('x-user-id', payload.sub as string)
+            return NextResponse.next({
+                request: { headers: requestHeaders }
+            })
         } catch (error) {
             // Token invalid/expired - redirect to login
             console.log('error', error)
