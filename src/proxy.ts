@@ -33,6 +33,7 @@ export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPath
             console.log('token verified')
             const requestHeaders = new Headers(request.headers)
             requestHeaders.set('x-user-id', payload.sub as string)
+            console.log('requestHeaders', requestHeaders)
             return NextResponse.next({
                 request: { headers: requestHeaders }
             })
