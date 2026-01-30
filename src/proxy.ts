@@ -34,6 +34,9 @@ export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPath
             const requestHeaders = new Headers(request.headers)
             requestHeaders.set('x-user-id', payload.sub as string)
             console.log('requestHeaders', requestHeaders)
+            console.log({
+                request: { headers: requestHeaders }
+            })
             return NextResponse.next({
                 request: { headers: requestHeaders }
             })
