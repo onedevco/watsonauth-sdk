@@ -34,7 +34,7 @@ Optional:
 ### 1. Install SDK
 
 ```bash
-npm install @watsonauth/sdk
+npm install github:onedevco/watsonauth-sdk
 ```
 
 ### 2. Add Environment Variables
