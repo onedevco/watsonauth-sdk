@@ -1,6 +1,6 @@
 {
   "name": "@watsonauth/sdk",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Client-side SDK for Watson Auth integration",
   "type": "module",
   "main": "./dist/index.cjs",

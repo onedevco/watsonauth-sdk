@@ -21,13 +21,8 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
       const { payload } = await jwtVerify(token, JWKS, {
         issuer: process.env.WATSON_AUTH_URL
       });
-      console.log("token verified");
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set("x-user-id", payload.sub);
-      console.log("requestHeaders", requestHeaders);
-      console.log({
-        request: { headers: requestHeaders }
-      });
       return NextResponse.next({
         request: { headers: requestHeaders }
       });
