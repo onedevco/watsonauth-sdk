@@ -6,7 +6,7 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
   const publicPaths = ["/login", "/callback", ...initPublicPaths];
   return async (request) => {
     const { pathname } = request.nextUrl;
-    if (publicPaths.some((p) => pathname === p || pathname.startsWith("/api/public"))) {
+    if (publicPaths.some((p) => p.endsWith("/") ? pathname.startsWith(p) : pathname === p)) {
       return NextResponse.next();
     }
     const token = request.cookies.get("access_token")?.value;

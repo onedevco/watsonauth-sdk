@@ -10,7 +10,11 @@ export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPath
         const { pathname } = request.nextUrl
 
         // Allow public paths
-        if (publicPaths.some((p) => pathname === p || pathname.startsWith('/api/public'))) {
+        // if (publicPaths.some((p) => pathname === p || pathname.startsWith('/api/public'))) {
+        //     return NextResponse.next()
+        // }
+
+        if (publicPaths.some((p) => p.endsWith('/') ? pathname.startsWith(p) : pathname === p)) {
             return NextResponse.next()
         }
 
