@@ -135,8 +135,94 @@ function useWatsonUser(options = {}) {
   }, [auto, refresh]);
   return { user, isLoading, error, refresh };
 }
+
+// src/useTokenRefresh.ts
+import { useEffect as useEffect3, useRef as useRef2 } from "react";
+var SESSION_EXPIRY_CODES = /* @__PURE__ */ new Set([
+  "token_missing",
+  "token_invalid",
+  "token_reused",
+  "session_revoked",
+  "token_expired",
+  "account_disabled"
+]);
+function getExpiresAt() {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)expires_at=([^;]+)/);
+  return match ? Number(match[1]) : null;
+}
+function useTokenRefresh(options = {}) {
+  const { endpoint = "/api/auth/refresh", threshold = 60, onSessionExpired } = options;
+  const timerRef = useRef2(null);
+  const refreshPromiseRef = useRef2(null);
+  const onExpiredRef = useRef2(onSessionExpired);
+  const thresholdRef = useRef2(threshold);
+  const endpointRef = useRef2(endpoint);
+  useEffect3(() => {
+    onExpiredRef.current = onSessionExpired;
+  }, [onSessionExpired]);
+  useEffect3(() => {
+    thresholdRef.current = threshold;
+  }, [threshold]);
+  useEffect3(() => {
+    endpointRef.current = endpoint;
+  }, [endpoint]);
+  const scheduleRef = useRef2();
+  const doRefreshRef = useRef2();
+  scheduleRef.current = (expiresAt) => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    const now = Date.now() / 1e3;
+    const delay = Math.max(0, (expiresAt - thresholdRef.current - now) * 1e3);
+    timerRef.current = setTimeout(() => {
+      if (!refreshPromiseRef.current) {
+        refreshPromiseRef.current = doRefreshRef.current().finally(() => {
+          refreshPromiseRef.current = null;
+        });
+      }
+    }, delay);
+  };
+  doRefreshRef.current = async (attempt = 0) => {
+    let res;
+    try {
+      res = await fetch(endpointRef.current, {
+        method: "POST",
+        credentials: "include"
+      });
+    } catch {
+      const expiresAt2 = getExpiresAt();
+      if (expiresAt2) scheduleRef.current(expiresAt2);
+      return;
+    }
+    if (res.ok) {
+      const data = await res.json();
+      const newExpiresAt = Math.floor(Date.now() / 1e3) + data.expiresIn;
+      scheduleRef.current(newExpiresAt);
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    if (body.code && SESSION_EXPIRY_CODES.has(body.code)) {
+      onExpiredRef.current?.();
+      return;
+    }
+    if (body.code === "server_error" && attempt < 3) {
+      const backoff = Math.min(1e3 * 2 ** attempt, 3e4);
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+      return doRefreshRef.current(attempt + 1);
+    }
+    const expiresAt = getExpiresAt();
+    if (expiresAt) scheduleRef.current(expiresAt);
+  };
+  useEffect3(() => {
+    const expiresAt = getExpiresAt();
+    if (expiresAt) scheduleRef.current(expiresAt);
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
+}
 export {
   UserProfileDropdown,
+  useTokenRefresh,
   useWatsonUser
 };
 //# sourceMappingURL=react.js.map

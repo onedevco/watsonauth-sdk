@@ -6,4 +6,11 @@ declare function createLogoutPOST(): () => Promise<NextResponse<{
     success: boolean;
 }>>;
 
-export { createCallbackGET, createLogoutPOST };
+declare function createRefreshPOST(): (request: NextRequest) => Promise<NextResponse<{
+    code?: string;
+    message?: string;
+}> | NextResponse<{
+    expiresIn: number;
+}>>;
+
+export { createCallbackGET, createLogoutPOST, createRefreshPOST };
