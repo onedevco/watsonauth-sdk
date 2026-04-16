@@ -33,19 +33,8 @@ export function createCallbackGET() {
             path: '/',
         })
 
-        // Readable cookie so client JS can schedule the refresh timer
-        response.cookies.set('expires_at', String(Math.floor(Date.now() / 1000) + expiresIn), {
-            httpOnly: false,
-            secure: isProduction,
-            sameSite: 'lax',
-            maxAge: expiresIn,
-            path: '/',
-        })
-
-        // Refresh token stored at path /api/auth so the browser only sends it
-        // to the refresh route, not to every request
         if (refreshToken) {
-            response.cookies.set('refresh_token', refreshToken, {
+            response.cookies.set('watson_refresh_token', refreshToken, {
                 httpOnly: true,
                 secure: isProduction,
                 sameSite: 'lax',

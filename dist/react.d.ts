@@ -19,11 +19,4 @@ type UseWatsonUserResult = {
 };
 declare function useWatsonUser(options?: UseWatsonUserOptions): UseWatsonUserResult;
 
-type UseTokenRefreshOptions = {
-    endpoint?: string;
-    threshold?: number;
-    onSessionExpired?: () => void;
-};
-declare function useTokenRefresh(options?: UseTokenRefreshOptions): void;
-
-export { useTokenRefresh, useWatsonUser };
+export { useWatsonUser };

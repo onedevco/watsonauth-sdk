@@ -54,15 +54,8 @@ function createCallbackGET() {
       maxAge: expiresIn,
       path: "/"
     });
-    response.cookies.set("expires_at", String(Math.floor(Date.now() / 1e3) + expiresIn), {
-      httpOnly: false,
-      secure: isProduction,
-      sameSite: "lax",
-      maxAge: expiresIn,
-      path: "/"
-    });
     if (refreshToken) {
-      response.cookies.set("refresh_token", refreshToken, {
+      response.cookies.set("watson_refresh_token", refreshToken, {
         httpOnly: true,
         secure: isProduction,
         sameSite: "lax",
@@ -93,17 +86,9 @@ function createLogoutPOST() {
 
 // src/refreshRoute.ts
 var import_server3 = require("next/server");
-var SESSION_EXPIRY_CODES = /* @__PURE__ */ new Set([
-  "token_missing",
-  "token_invalid",
-  "token_reused",
-  "session_revoked",
-  "token_expired",
-  "account_disabled"
-]);
 function createRefreshPOST() {
   return async (request) => {
-    const refreshToken = request.cookies.get("refresh_token")?.value;
+    const refreshToken = request.cookies.get("watson_refresh_token")?.value;
     if (!refreshToken) {
       return import_server3.NextResponse.json(
         { code: "token_missing", message: "No refresh token" },
@@ -115,9 +100,7 @@ function createRefreshPOST() {
       res = await fetch(`${process.env.WATSON_AUTH_URL}/api/auth/refresh`, {
         method: "POST",
         headers: {
-          // Forward the refresh token as a cookie so Watson Auth
-          // receives it on the expected path
-          Cookie: `refresh_token=${refreshToken}`
+          Cookie: `watson_refresh_token=${refreshToken}`
         }
       });
     } catch {
@@ -129,14 +112,11 @@ function createRefreshPOST() {
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       const response2 = import_server3.NextResponse.json(body, { status: res.status });
-      if (body.code && SESSION_EXPIRY_CODES.has(body.code)) {
-        clearAuthCookies(response2);
-      }
+      if (res.status === 401) clearAuthCookies(response2);
       return response2;
     }
     const data = await res.json();
     const isProduction = process.env.NODE_ENV === "production";
-    const expiresAt = Math.floor(Date.now() / 1e3) + data.expiresIn;
     const response = import_server3.NextResponse.json({ expiresIn: data.expiresIn });
     response.cookies.set("access_token", data.accessToken, {
       httpOnly: true,
@@ -145,20 +125,19 @@ function createRefreshPOST() {
       maxAge: data.expiresIn,
       path: "/"
     });
-    response.cookies.set("expires_at", String(expiresAt), {
-      httpOnly: false,
+    response.cookies.set("watson_refresh_token", data.refreshToken, {
+      httpOnly: true,
       secure: isProduction,
       sameSite: "lax",
-      maxAge: data.expiresIn,
-      path: "/"
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/api/auth"
     });
     return response;
   };
 }
 function clearAuthCookies(response) {
   response.cookies.set("access_token", "", { maxAge: 0, path: "/" });
-  response.cookies.set("refresh_token", "", { maxAge: 0, path: "/api/auth" });
-  response.cookies.set("expires_at", "", { maxAge: 0, path: "/" });
+  response.cookies.set("watson_refresh_token", "", { maxAge: 0, path: "/api/auth" });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

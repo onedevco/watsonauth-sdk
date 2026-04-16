@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const SESSION_EXPIRY_CODES = new Set([
-    'token_missing',
-    'token_invalid',
-    'token_reused',
-    'session_revoked',
-    'token_expired',
-    'account_disabled',
-])
-
 export function createRefreshPOST() {
     return async (request: NextRequest) => {
-        const refreshToken = request.cookies.get('refresh_token')?.value
+        const refreshToken = request.cookies.get('watson_refresh_token')?.value
 
         if (!refreshToken) {
             return NextResponse.json(
@@ -25,9 +16,7 @@ export function createRefreshPOST() {
             res = await fetch(`${process.env.WATSON_AUTH_URL}/api/auth/refresh`, {
                 method: 'POST',
                 headers: {
-                    // Forward the refresh token as a cookie so Watson Auth
-                    // receives it on the expected path
-                    Cookie: `refresh_token=${refreshToken}`,
+                    Cookie: `watson_refresh_token=${refreshToken}`,
                 },
             })
         } catch {
@@ -40,19 +29,17 @@ export function createRefreshPOST() {
         if (!res.ok) {
             const body = await res.json().catch(() => ({})) as { code?: string; message?: string }
             const response = NextResponse.json(body, { status: res.status })
-
-            // Clear all auth cookies on terminal session errors
-            if (body.code && SESSION_EXPIRY_CODES.has(body.code)) {
-                clearAuthCookies(response)
-            }
-
+            // Any 401 means the session is dead — clear all auth cookies
+            if (res.status === 401) clearAuthCookies(response)
             return response
         }
 
-        const data = await res.json() as { accessToken: string; expiresIn: number }
+        const data = await res.json() as {
+            accessToken: string
+            refreshToken: string
+            expiresIn: number
+        }
         const isProduction = process.env.NODE_ENV === 'production'
-        const expiresAt = Math.floor(Date.now() / 1000) + data.expiresIn
-
         const response = NextResponse.json({ expiresIn: data.expiresIn })
 
         response.cookies.set('access_token', data.accessToken, {
@@ -63,12 +50,13 @@ export function createRefreshPOST() {
             path: '/',
         })
 
-        response.cookies.set('expires_at', String(expiresAt), {
-            httpOnly: false,
+        // Rotation: replace the old refresh token with the new one
+        response.cookies.set('watson_refresh_token', data.refreshToken, {
+            httpOnly: true,
             secure: isProduction,
             sameSite: 'lax',
-            maxAge: data.expiresIn,
-            path: '/',
+            maxAge: 60 * 60 * 24 * 30,
+            path: '/api/auth',
         })
 
         return response
@@ -77,6 +65,5 @@ export function createRefreshPOST() {
 
 function clearAuthCookies(response: NextResponse) {
     response.cookies.set('access_token', '', { maxAge: 0, path: '/' })
-    response.cookies.set('refresh_token', '', { maxAge: 0, path: '/api/auth' })
-    response.cookies.set('expires_at', '', { maxAge: 0, path: '/' })
+    response.cookies.set('watson_refresh_token', '', { maxAge: 0, path: '/api/auth' })
 }
