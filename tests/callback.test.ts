@@ -41,7 +41,7 @@ describe('createCallbackGET', () => {
         expect(res.headers.get('location')).toBe('https://app.test/dashboard')
     })
 
-    it('stores refresh token with /api/auth path when provided', async () => {
+    it('stores refresh token with / path when provided', async () => {
         const token = makeJwtExpiringIn(900)
         const req = buildRequest(
             `https://app.test/callback?token=${token}&refreshToken=rt_123`
@@ -50,7 +50,7 @@ describe('createCallbackGET', () => {
 
         const refresh = res.cookies.get('watson_refresh_token')
         expect(refresh?.value).toBe('rt_123')
-        expect(refresh?.path).toBe('/api/auth')
+        expect(refresh?.path).toBe('/')
         expect(refresh?.httpOnly).toBe(true)
         expect(refresh?.maxAge).toBe(60 * 60 * 24 * 30)
     })

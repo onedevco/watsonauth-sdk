@@ -83,7 +83,7 @@ function applyRefreshedTokens(response: NextResponse, result: RefreshResult): vo
         secure,
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 30,
-        path: '/api/auth',
+        path: '/',
     })
 }
 

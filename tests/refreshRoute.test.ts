@@ -70,7 +70,7 @@ describe('createRefreshPOST', () => {
 
         const refresh = res.cookies.get('watson_refresh_token')
         expect(refresh?.value).toBe('new-refresh')
-        expect(refresh?.path).toBe('/api/auth')
+        expect(refresh?.path).toBe('/')
         expect(refresh?.maxAge).toBe(60 * 60 * 24 * 30)
     })
 

@@ -100,7 +100,7 @@ Refresh is entirely server-side — the browser is never involved.
 | Cookie | httpOnly | Path | Lifetime |
 |--------|----------|------|----------|
 | `access_token` | yes | `/` | token `exp` |
-| `watson_refresh_token` | yes | `/api/auth` | 30 days |
+| `watson_refresh_token` | yes | `/` | 30 days |
 
 **Mutex:** A module-level promise prevents concurrent refresh calls within the same Node.js process. This has no effect in Edge runtime (stateless). For Edge, use an external lock (e.g. Upstash Redis).
 

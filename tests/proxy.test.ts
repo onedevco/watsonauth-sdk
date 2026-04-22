@@ -145,7 +145,7 @@ describe('createWatsonAuthProxy', () => {
 
             const refresh = res.cookies.get('watson_refresh_token')
             expect(refresh?.value).toBe('rotated-refresh')
-            expect(refresh?.path).toBe('/api/auth')
+            expect(refresh?.path).toBe('/')
 
             // Derived user id flows through from the new access token
             expect(res.headers.get('x-middleware-request-x-user-id')).toBe('user_42')
