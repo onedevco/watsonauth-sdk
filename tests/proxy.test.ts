@@ -80,8 +80,30 @@ describe('createWatsonAuthProxy', () => {
     })
 
     describe('no token', () => {
-        it('redirects to login when access_token cookie is missing', async () => {
+        it('redirects to login when both cookies are missing', async () => {
             const res = await proxy(makeRequest('/dashboard'))
+            expect(isRedirectToLogin(res)).toBe(true)
+        })
+
+        it('refreshes using watson_refresh_token when access_token is missing', async () => {
+            const newAccess = makeJwtExpiringIn(900, { sub: 'user_restored' })
+            fetchMock.mockResolvedValue(
+                jsonResponse({ accessToken: newAccess, refreshToken: 'new-rt', expiresIn: 900 })
+            )
+
+            const res = await proxy(makeRequest('/dashboard', { watson_refresh_token: 'old-rt' }))
+
+            expect(isNext(res)).toBe(true)
+            expect(res.cookies.get('access_token')?.value).toBe(newAccess)
+            expect(res.cookies.get('watson_refresh_token')?.value).toBe('new-rt')
+            expect(res.headers.get('x-middleware-request-x-user-id')).toBe('user_restored')
+        })
+
+        it('redirects to login when access_token is missing and refresh fails', async () => {
+            fetchMock.mockResolvedValue(jsonResponse({ code: 'invalid' }, { status: 401 }))
+
+            const res = await proxy(makeRequest('/dashboard', { watson_refresh_token: 'old-rt' }))
+
             expect(isRedirectToLogin(res)).toBe(true)
         })
     })

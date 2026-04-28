@@ -11,8 +11,10 @@ interface WatsonAuthDebugEvent {
     refreshedAt?: number;
     reason?: 'no_token' | 'no_refresh_token' | 'refresh_failed' | 'jwt_invalid';
 }
-declare function createWatsonAuthProxy({ initPublicPaths, debug, }: {
+declare function createWatsonAuthProxy({ initPublicPaths, refreshThreshold, debug, }: {
     initPublicPaths?: string[];
+    /** Seconds before expiry at which proactive refresh is triggered. Defaults to 60. */
+    refreshThreshold?: number;
     debug?: boolean | ((event: WatsonAuthDebugEvent) => void);
 }): (request: NextRequest) => Promise<NextResponse<unknown>>;
 

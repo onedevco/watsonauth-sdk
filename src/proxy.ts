@@ -116,12 +116,17 @@ function setDebugCookie(response: NextResponse, event: WatsonAuthDebugEvent): vo
 
 export function createWatsonAuthProxy({
     initPublicPaths = [],
+    refreshThreshold,
     debug,
 }: {
     initPublicPaths?: string[]
+    /** Seconds before expiry at which proactive refresh is triggered. Defaults to 60. */
+    refreshThreshold?: number
     debug?: boolean | ((event: WatsonAuthDebugEvent) => void)
 }) {
     const publicPaths = ['/login', '/callback', ...initPublicPaths]
+    const threshold = refreshThreshold
+        ?? (process.env.WATSON_AUTH_REFRESH_THRESHOLD ? Number(process.env.WATSON_AUTH_REFRESH_THRESHOLD) : 60)
 
     const log = debug
         ? (event: WatsonAuthDebugEvent) => {
@@ -150,12 +155,30 @@ export function createWatsonAuthProxy({
 
         const token = request.cookies.get('access_token')?.value
         if (!token) {
-            return loginRedirect({ action: 'redirect', path: pathname, reason: 'no_token' })
+            const currentRefreshToken = request.cookies.get('watson_refresh_token')?.value
+            if (!currentRefreshToken) {
+                return loginRedirect({ action: 'redirect', path: pathname, reason: 'no_token' })
+            }
+            const result = await refreshTokens(currentRefreshToken)
+            if (!result) {
+                return loginRedirect({ action: 'redirect', path: pathname, reason: 'refresh_failed' })
+            }
+            const requestHeaders = new Headers(request.headers)
+            requestHeaders.set('x-user-id', result.userId)
+            const response = NextResponse.next({ request: { headers: requestHeaders } })
+            applyRefreshedTokens(response, result)
+            return emit(response, {
+                action: 'refresh',
+                path: pathname,
+                userId: result.userId,
+                tokenExpiresAt: Math.floor(Date.now() / 1000) + result.expiresIn,
+                refreshedAt: Date.now(),
+            })
         }
 
         // Proactive refresh: rotate before the request reaches any handler
         // so downstream code always gets a valid token in x-user-id / cookies
-        if (isNearExpiry(token)) {
+        if (isNearExpiry(token, threshold)) {
             const currentRefreshToken = request.cookies.get('watson_refresh_token')?.value
             if (!currentRefreshToken) {
                 return loginRedirect({ action: 'redirect', path: pathname, reason: 'no_refresh_token' })
