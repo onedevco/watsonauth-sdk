@@ -7,12 +7,6 @@ export function createCallbackGET() {
         const refreshToken = request.nextUrl.searchParams.get('refreshToken')
         const redirectTo = request.nextUrl.searchParams.get('redirect') || '/'
 
-        if (process.env.NODE_ENV === 'development') {
-            console.log('accessToken', accessToken)
-            console.log('refreshToken', refreshToken)
-            console.log('redirectTo', redirectTo)
-        }
-
         if (!accessToken) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
