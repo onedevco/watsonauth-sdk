@@ -221,4 +221,111 @@ describe('createWatsonAuthProxy', () => {
             expect(isRedirectToLogin(res)).toBe(true)
         })
     })
+
+    describe('debug mode', () => {
+        it('calls the debug callback with action:allow on a valid token', async () => {
+            const token = makeJwtExpiringIn(900, { sub: 'user_debug' })
+            vi.mocked(jwtVerify).mockResolvedValue({
+                payload: { sub: 'user_debug', exp: Math.floor(Date.now() / 1000) + 900 },
+                protectedHeader: { alg: 'RS256' },
+            } as any)
+
+            const events: unknown[] = []
+            const debugProxy = createWatsonAuthProxy({
+                debug: (e) => events.push(e),
+            })
+
+            await debugProxy(makeRequest('/dashboard', { access_token: token }))
+
+            expect(events).toHaveLength(1)
+            expect(events[0]).toMatchObject({ action: 'allow', path: '/dashboard', userId: 'user_debug' })
+        })
+
+        it('calls the debug callback with action:refresh on a proactive refresh', async () => {
+            const nearExpiry = makeJwtExpiringIn(10)
+            const newAccess = makeJwtExpiringIn(900, { sub: 'user_r' })
+            fetchMock.mockResolvedValue(jsonResponse({ accessToken: newAccess, refreshToken: 'rt2', expiresIn: 900 }))
+
+            const events: unknown[] = []
+            const debugProxy = createWatsonAuthProxy({ debug: (e) => events.push(e) })
+
+            await debugProxy(makeRequest('/dashboard', {
+                access_token: nearExpiry,
+                watson_refresh_token: 'rt1',
+            }))
+
+            expect(events).toHaveLength(1)
+            expect(events[0]).toMatchObject({
+                action: 'refresh',
+                path: '/dashboard',
+                userId: 'user_r',
+            })
+            expect((events[0] as any).tokenExpiresAt).toBeGreaterThan(Date.now() / 1000)
+            expect((events[0] as any).refreshedAt).toBeGreaterThan(0)
+        })
+
+        it('calls the debug callback with action:redirect and reason on missing token', async () => {
+            const events: unknown[] = []
+            const debugProxy = createWatsonAuthProxy({ debug: (e) => events.push(e) })
+
+            const res = await debugProxy(makeRequest('/dashboard'))
+
+            expect(isRedirectToLogin(res)).toBe(true)
+            expect(events).toHaveLength(1)
+            expect(events[0]).toMatchObject({ action: 'redirect', path: '/dashboard', reason: 'no_token' })
+        })
+
+        it('calls the debug callback with reason:no_refresh_token when near-expiry token has no refresh cookie', async () => {
+            const events: unknown[] = []
+            const debugProxy = createWatsonAuthProxy({ debug: (e) => events.push(e) })
+
+            const res = await debugProxy(makeRequest('/dashboard', { access_token: makeJwtExpiringIn(10) }))
+
+            expect(isRedirectToLogin(res)).toBe(true)
+            expect(events[0]).toMatchObject({ action: 'redirect', reason: 'no_refresh_token' })
+        })
+
+        it('calls the debug callback with reason:refresh_failed when refresh endpoint fails', async () => {
+            const events: unknown[] = []
+            const debugProxy = createWatsonAuthProxy({ debug: (e) => events.push(e) })
+            fetchMock.mockResolvedValue(jsonResponse({ code: 'invalid' }, { status: 401 }))
+
+            const res = await debugProxy(makeRequest('/dashboard', {
+                access_token: makeJwtExpiringIn(10),
+                watson_refresh_token: 'rt',
+            }))
+
+            expect(isRedirectToLogin(res)).toBe(true)
+            expect(events[0]).toMatchObject({ action: 'redirect', reason: 'refresh_failed' })
+        })
+
+        it('sets a readable watson_auth_debug cookie on the response', async () => {
+            const token = makeJwtExpiringIn(900, { sub: 'u1' })
+            vi.mocked(jwtVerify).mockResolvedValue({
+                payload: { sub: 'u1', exp: Math.floor(Date.now() / 1000) + 900 },
+                protectedHeader: { alg: 'RS256' },
+            } as any)
+
+            const debugProxy = createWatsonAuthProxy({ debug: true })
+            const res = await debugProxy(makeRequest('/dashboard', { access_token: token }))
+
+            const cookie = res.cookies.get('watson_auth_debug')
+            expect(cookie).toBeDefined()
+            expect(cookie?.httpOnly).toBe(false)
+            const parsed = JSON.parse(cookie!.value)
+            expect(parsed).toMatchObject({ action: 'allow', path: '/dashboard', userId: 'u1' })
+        })
+
+        it('does not set a watson_auth_debug cookie when debug is not enabled', async () => {
+            const token = makeJwtExpiringIn(900, { sub: 'u1' })
+            vi.mocked(jwtVerify).mockResolvedValue({
+                payload: { sub: 'u1', exp: Math.floor(Date.now() / 1000) + 900 },
+                protectedHeader: { alg: 'RS256' },
+            } as any)
+
+            const res = await proxy(makeRequest('/dashboard', { access_token: token }))
+
+            expect(res.cookies.get('watson_auth_debug')).toBeUndefined()
+        })
+    })
 })

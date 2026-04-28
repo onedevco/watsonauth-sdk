@@ -21,6 +21,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var react_exports = {};
 __export(react_exports, {
   UserProfileDropdown: () => UserProfileDropdown,
+  WatsonAuthDebugPanel: () => WatsonAuthDebugPanel,
   useWatsonUser: () => useWatsonUser
 });
 module.exports = __toCommonJS(react_exports);
@@ -162,9 +163,108 @@ function useWatsonUser(options = {}) {
   }, [auto, refresh]);
   return { user, isLoading, error, refresh };
 }
+
+// src/debugPanel.tsx
+var import_react3 = require("react");
+var import_jsx_runtime2 = require("react/jsx-runtime");
+function readDebugCookie() {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/watson_auth_debug=([^;]+)/);
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
+}
+function useCountdown(expiresAt) {
+  const [seconds, setSeconds] = (0, import_react3.useState)(null);
+  (0, import_react3.useEffect)(() => {
+    if (!expiresAt) {
+      setSeconds(null);
+      return;
+    }
+    const tick = () => setSeconds(Math.floor(expiresAt - Date.now() / 1e3));
+    tick();
+    const id = setInterval(tick, 1e3);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  return seconds;
+}
+var ACTION_COLORS = {
+  allow: { bg: "#0f3460", text: "#93c5fd" },
+  refresh: { bg: "#14532d", text: "#86efac" },
+  redirect: { bg: "#7f1d1d", text: "#fca5a5" }
+};
+function Badge({ action }) {
+  const colors = ACTION_COLORS[action] ?? { bg: "#1e293b", text: "#94a3b8" };
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: {
+    display: "inline-block",
+    padding: "1px 7px",
+    borderRadius: "4px",
+    fontSize: "11px",
+    fontWeight: 700,
+    background: colors.bg,
+    color: colors.text,
+    letterSpacing: "0.03em"
+  }, children: action });
+}
+function Row({ label, children }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "7px", gap: "16px" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#64748b", fontSize: "11px", flexShrink: 0 }, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#e2e8f0", fontSize: "11px", textAlign: "right", wordBreak: "break-all" }, children })
+  ] });
+}
+function WatsonAuthDebugPanel() {
+  const [event, setEvent] = (0, import_react3.useState)(null);
+  const [open, setOpen] = (0, import_react3.useState)(true);
+  const countdown = useCountdown(event?.tokenExpiresAt);
+  const refresh = (0, import_react3.useCallback)(() => setEvent(readDebugCookie()), []);
+  (0, import_react3.useEffect)(() => {
+    refresh();
+    const id = setInterval(refresh, 2e3);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [refresh]);
+  const expiryColor = countdown === null ? "#94a3b8" : countdown < 30 ? "#f87171" : countdown < 120 ? "#fbbf24" : "#86efac";
+  const lastRefresh = event?.refreshedAt ? new Date(event.refreshedAt).toLocaleTimeString() : "\u2014";
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { position: "fixed", bottom: "16px", right: "16px", zIndex: 9999, fontFamily: "monospace" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: {
+    background: "#0f172a",
+    color: "#e2e8f0",
+    borderRadius: "8px",
+    padding: open ? "12px 16px 14px" : "9px 14px",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+    minWidth: "260px",
+    border: "1px solid #1e293b"
+  }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+      "div",
+      {
+        onClick: () => setOpen((o) => !o),
+        style: { display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#60a5fa", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }, children: "WatsonAuth Debug" }),
+          event && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Badge, { action: event.action }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#475569", fontSize: "10px", marginLeft: "6px" }, children: open ? "\u25BC" : "\u25B2" })
+        ]
+      }
+    ),
+    open && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { marginTop: "4px" }, children: !event ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { color: "#475569", fontSize: "11px", marginTop: "8px" }, children: "No requests intercepted yet" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Row, { label: "path", children: event.path }),
+      event.reason && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Row, { label: "reason", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: "#fca5a5" }, children: event.reason }) }),
+      event.userId && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Row, { label: "user", children: event.userId }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Row, { label: "token expires in", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { color: expiryColor, fontWeight: 600 }, children: countdown !== null ? `${countdown}s` : "\u2014" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Row, { label: "last refresh", children: lastRefresh })
+    ] }) })
+  ] }) });
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   UserProfileDropdown,
+  WatsonAuthDebugPanel,
   useWatsonUser
 });
 //# sourceMappingURL=react.cjs.map

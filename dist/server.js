@@ -57,7 +57,7 @@ function applyRefreshedTokens(response, result) {
     secure,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 30,
-    path: "/api/auth"
+    path: "/"
   });
 }
 function redirectToLogin() {
@@ -66,25 +66,61 @@ function redirectToLogin() {
   loginUrl.searchParams.set("callback", `${process.env.NEXT_PUBLIC_APP_URL}/callback`);
   return NextResponse.redirect(loginUrl);
 }
-function createWatsonAuthProxy({ initPublicPaths = [] }) {
+function setDebugCookie(response, event) {
+  response.cookies.set("watson_auth_debug", JSON.stringify(event), {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60
+  });
+}
+function createWatsonAuthProxy({
+  initPublicPaths = [],
+  debug
+}) {
   const publicPaths = ["/login", "/callback", ...initPublicPaths];
+  const log = debug ? (event) => {
+    if (typeof debug === "function") debug(event);
+    else console.log("[WatsonAuth]", JSON.stringify(event));
+  } : null;
+  function emit(response, event) {
+    if (!log) return response;
+    log(event);
+    setDebugCookie(response, event);
+    return response;
+  }
+  function loginRedirect(event) {
+    return emit(redirectToLogin(), event);
+  }
   return async (request) => {
     const { pathname } = request.nextUrl;
     if (publicPaths.some((p) => p.endsWith("/") ? pathname.startsWith(p) : pathname === p)) {
       return NextResponse.next();
     }
     const token = request.cookies.get("access_token")?.value;
-    if (!token) return redirectToLogin();
+    if (!token) {
+      return loginRedirect({ action: "redirect", path: pathname, reason: "no_token" });
+    }
     if (isNearExpiry(token)) {
       const currentRefreshToken = request.cookies.get("watson_refresh_token")?.value;
-      if (!currentRefreshToken) return redirectToLogin();
+      if (!currentRefreshToken) {
+        return loginRedirect({ action: "redirect", path: pathname, reason: "no_refresh_token" });
+      }
       const result = await refreshTokens(currentRefreshToken);
-      if (!result) return redirectToLogin();
+      if (!result) {
+        return loginRedirect({ action: "redirect", path: pathname, reason: "refresh_failed" });
+      }
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set("x-user-id", result.userId);
       const response = NextResponse.next({ request: { headers: requestHeaders } });
       applyRefreshedTokens(response, result);
-      return response;
+      return emit(response, {
+        action: "refresh",
+        path: pathname,
+        userId: result.userId,
+        tokenExpiresAt: Math.floor(Date.now() / 1e3) + result.expiresIn,
+        refreshedAt: Date.now()
+      });
     }
     try {
       const { payload } = await jwtVerify(token, JWKS, {
@@ -92,17 +128,33 @@ function createWatsonAuthProxy({ initPublicPaths = [] }) {
       });
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set("x-user-id", payload.sub);
-      return NextResponse.next({ request: { headers: requestHeaders } });
+      const response = NextResponse.next({ request: { headers: requestHeaders } });
+      return emit(response, {
+        action: "allow",
+        path: pathname,
+        userId: payload.sub,
+        tokenExpiresAt: payload.exp
+      });
     } catch {
       const currentRefreshToken = request.cookies.get("watson_refresh_token")?.value;
-      if (!currentRefreshToken) return redirectToLogin();
+      if (!currentRefreshToken) {
+        return loginRedirect({ action: "redirect", path: pathname, reason: "jwt_invalid" });
+      }
       const result = await refreshTokens(currentRefreshToken);
-      if (!result) return redirectToLogin();
+      if (!result) {
+        return loginRedirect({ action: "redirect", path: pathname, reason: "refresh_failed" });
+      }
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set("x-user-id", result.userId);
       const response = NextResponse.next({ request: { headers: requestHeaders } });
       applyRefreshedTokens(response, result);
-      return response;
+      return emit(response, {
+        action: "refresh",
+        path: pathname,
+        userId: result.userId,
+        tokenExpiresAt: Math.floor(Date.now() / 1e3) + result.expiresIn,
+        refreshedAt: Date.now()
+      });
     }
   };
 }

@@ -61,7 +61,7 @@ function createCallbackGET() {
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 30,
         // 30 days
-        path: "/api/auth"
+        path: "/"
       });
     }
     return response;
@@ -130,14 +130,14 @@ function createRefreshPOST() {
       secure: isProduction,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30,
-      path: "/api/auth"
+      path: "/"
     });
     return response;
   };
 }
 function clearAuthCookies(response) {
   response.cookies.set("access_token", "", { maxAge: 0, path: "/" });
-  response.cookies.set("watson_refresh_token", "", { maxAge: 0, path: "/api/auth" });
+  response.cookies.set("watson_refresh_token", "", { maxAge: 0, path: "/" });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

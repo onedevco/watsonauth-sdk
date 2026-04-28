@@ -1,5 +1,5 @@
 export { UserProfileDropdown } from './Logout.cjs';
-import 'react/jsx-runtime';
+import * as react_jsx_runtime from 'react/jsx-runtime';
 
 type WatsonUser = {
     id: string;
@@ -19,4 +19,6 @@ type UseWatsonUserResult = {
 };
 declare function useWatsonUser(options?: UseWatsonUserOptions): UseWatsonUserResult;
 
-export { useWatsonUser };
+declare function WatsonAuthDebugPanel(): react_jsx_runtime.JSX.Element;
+
+export { WatsonAuthDebugPanel, useWatsonUser };

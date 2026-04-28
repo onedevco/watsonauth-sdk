@@ -10,6 +10,17 @@ const JWKS = createRemoteJWKSet(new URL('/.well-known/jwks.json', process.env.WA
 // external lock (e.g. Upstash Redis) if concurrent refresh protection matters.
 let refreshInFlight: Promise<RefreshResult | null> | null = null
 
+export interface WatsonAuthDebugEvent {
+    action: 'allow' | 'refresh' | 'redirect'
+    path: string
+    userId?: string
+    /** Unix seconds — when the current access token expires */
+    tokenExpiresAt?: number
+    /** Date.now() value — when the last refresh completed */
+    refreshedAt?: number
+    reason?: 'no_token' | 'no_refresh_token' | 'refresh_failed' | 'jwt_invalid'
+}
+
 interface RefreshResult {
     accessToken: string
     refreshToken: string
@@ -94,8 +105,41 @@ function redirectToLogin(): NextResponse {
     return NextResponse.redirect(loginUrl)
 }
 
-export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPaths?: string[] }) {
+function setDebugCookie(response: NextResponse, event: WatsonAuthDebugEvent): void {
+    response.cookies.set('watson_auth_debug', JSON.stringify(event), {
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60,
+    })
+}
+
+export function createWatsonAuthProxy({
+    initPublicPaths = [],
+    debug,
+}: {
+    initPublicPaths?: string[]
+    debug?: boolean | ((event: WatsonAuthDebugEvent) => void)
+}) {
     const publicPaths = ['/login', '/callback', ...initPublicPaths]
+
+    const log = debug
+        ? (event: WatsonAuthDebugEvent) => {
+            if (typeof debug === 'function') debug(event)
+            else console.log('[WatsonAuth]', JSON.stringify(event))
+          }
+        : null
+
+    function emit(response: NextResponse, event: WatsonAuthDebugEvent): NextResponse {
+        if (!log) return response
+        log(event)
+        setDebugCookie(response, event)
+        return response
+    }
+
+    function loginRedirect(event: WatsonAuthDebugEvent): NextResponse {
+        return emit(redirectToLogin(), event)
+    }
 
     return async (request: NextRequest) => {
         const { pathname } = request.nextUrl
@@ -105,22 +149,34 @@ export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPath
         }
 
         const token = request.cookies.get('access_token')?.value
-        if (!token) return redirectToLogin()
+        if (!token) {
+            return loginRedirect({ action: 'redirect', path: pathname, reason: 'no_token' })
+        }
 
         // Proactive refresh: rotate before the request reaches any handler
         // so downstream code always gets a valid token in x-user-id / cookies
         if (isNearExpiry(token)) {
             const currentRefreshToken = request.cookies.get('watson_refresh_token')?.value
-            if (!currentRefreshToken) return redirectToLogin()
+            if (!currentRefreshToken) {
+                return loginRedirect({ action: 'redirect', path: pathname, reason: 'no_refresh_token' })
+            }
 
             const result = await refreshTokens(currentRefreshToken)
-            if (!result) return redirectToLogin()
+            if (!result) {
+                return loginRedirect({ action: 'redirect', path: pathname, reason: 'refresh_failed' })
+            }
 
             const requestHeaders = new Headers(request.headers)
             requestHeaders.set('x-user-id', result.userId)
             const response = NextResponse.next({ request: { headers: requestHeaders } })
             applyRefreshedTokens(response, result)
-            return response
+            return emit(response, {
+                action: 'refresh',
+                path: pathname,
+                userId: result.userId,
+                tokenExpiresAt: Math.floor(Date.now() / 1000) + result.expiresIn,
+                refreshedAt: Date.now(),
+            })
         }
 
         // Full JWT verification for tokens not near expiry
@@ -130,21 +186,37 @@ export function createWatsonAuthProxy({ initPublicPaths = [] }: { initPublicPath
             })
             const requestHeaders = new Headers(request.headers)
             requestHeaders.set('x-user-id', payload.sub as string)
-            return NextResponse.next({ request: { headers: requestHeaders } })
+            const response = NextResponse.next({ request: { headers: requestHeaders } })
+            return emit(response, {
+                action: 'allow',
+                path: pathname,
+                userId: payload.sub as string,
+                tokenExpiresAt: payload.exp as number,
+            })
         } catch {
             // Verification failed — token may have expired in the window between
             // the isNearExpiry check and here. Attempt refresh before giving up.
             const currentRefreshToken = request.cookies.get('watson_refresh_token')?.value
-            if (!currentRefreshToken) return redirectToLogin()
+            if (!currentRefreshToken) {
+                return loginRedirect({ action: 'redirect', path: pathname, reason: 'jwt_invalid' })
+            }
 
             const result = await refreshTokens(currentRefreshToken)
-            if (!result) return redirectToLogin()
+            if (!result) {
+                return loginRedirect({ action: 'redirect', path: pathname, reason: 'refresh_failed' })
+            }
 
             const requestHeaders = new Headers(request.headers)
             requestHeaders.set('x-user-id', result.userId)
             const response = NextResponse.next({ request: { headers: requestHeaders } })
             applyRefreshedTokens(response, result)
-            return response
+            return emit(response, {
+                action: 'refresh',
+                path: pathname,
+                userId: result.userId,
+                tokenExpiresAt: Math.floor(Date.now() / 1000) + result.expiresIn,
+                refreshedAt: Date.now(),
+            })
         }
     }
 }
